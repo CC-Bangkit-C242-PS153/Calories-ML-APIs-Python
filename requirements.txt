@@ -1,0 +1,5 @@
+fastapi==0.115.5
+google-cloud-firestore==2.19.0
+grpcio==1.68.0
+tensorflow==2.18.0
+uvicorn==0.32.0
