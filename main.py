@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from firestoredb import store_data
+from storage import download
 from datetime import datetime
 import tensorflow as tf
 import numpy as np
@@ -52,6 +53,8 @@ async def home(request: Request):
     try:
         payload = await request.json()
         pubsubMessage = decode_base64_json(payload['message']['data'])
+        image = download(pubsubMessage)
+        print(image)
 
         new_data = np.array([
             [
@@ -77,6 +80,7 @@ async def home(request: Request):
             "userId": pubsubMessage["userId"],
             "inferenceId": pubsubMessage["inferenceId"],
             "result": result,
+            "statusImage":image,
             "createdAt": createdAt,
         }
 
