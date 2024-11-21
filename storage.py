@@ -13,4 +13,7 @@ def download(data):
 
     # Mengunduh konten file
     contents = blob.download_as_bytes()  # Konten dalam format bytes
-    return "Image Berhasil di Download"
+    if(contents):
+        return "Image Berhasil di Download"
+    else:
+        return "Image Gagal di Download"
