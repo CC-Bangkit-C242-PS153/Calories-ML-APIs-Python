@@ -38,7 +38,7 @@ def decode_base64_json(data):
 
 # Coba untuk memuat model dan beri callback
 try:
-    model = tf.keras.models.load_model('model/model.h5')
+    model = tf.keras.models.load_model('model/sleepmodel.h5')
     model_loaded_callback(True, "Success to load model")
 except Exception as e:
     model_loaded_callback(False, str(e))
@@ -55,8 +55,8 @@ async def home(request: Request):
 
         new_data = np.array([
             [
-                int(pubsubMessage['data']['water']),
-                int(pubsubMessage['data']['protein']),
+                float(pubsubMessage['data']['water']),
+                float(pubsubMessage['data']['protein']),
                 float(pubsubMessage['data']['lipid']),
                 float(pubsubMessage['data']['ash']),
                 float(pubsubMessage['data']['carbohydrate']),
