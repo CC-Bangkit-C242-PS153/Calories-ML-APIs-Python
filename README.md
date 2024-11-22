@@ -10,7 +10,7 @@ The Fitcal backend is built using the Python programming language, and FastAPI f
 
 To get started with the Fitcal MLs backend, follow these steps:
 
-1. Clone the repository: `git clone https://github.com/CC-Bangkit-C242-PS153/Calories-ML-APIs.git`
+1. Clone the repository: `git clone https://github.com/CC-Bangkit-C242-PS153/Calories-ML-APIs-Python.git`
 2. Install the dependencies: `pip install -r requirements.txt`
 3. Set up the environment variables by creating a `.env` file (refer to the .env section below).
 4. Run the application: `python main.py`
