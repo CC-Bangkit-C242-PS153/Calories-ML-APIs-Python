@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from firestoredb import store_data
@@ -6,6 +6,7 @@ from storage import download
 from datetime import datetime
 import tensorflow as tf
 import numpy as np
+import asyncio
 import os
 import base64
 import json
@@ -22,13 +23,6 @@ app.add_middleware(
     allow_headers=["*"],  # Izinkan semua header
 )
 
-# Fungsi callback untuk memverifikasi apakah model berhasil dimuat
-def model_loaded_callback(success, message):
-    if success:
-        print("Success to load model")
-    else:
-        print(f"Model gagal dimuat: {message}")
-
 def decode_base64_json(data):
     # Mendekode data Base64 menjadi bytes
     decoded_bytes = base64.b64decode(data)
@@ -37,16 +31,31 @@ def decode_base64_json(data):
     decoded_str = decoded_bytes.decode('utf-8')
     return json.loads(decoded_str)
 
-# Coba untuk memuat model dan beri callback
-try:
-    model = tf.keras.models.load_model('model/sleepmodel.h5')
-    model_loaded_callback(True, "Success to load model")
-except Exception as e:
-    model_loaded_callback(False, str(e))
-    model = None
+# Variabel global untuk menyimpan model
+model = None
+LOCAL_MODEL_PATH = "model/model.h5"
+
+# Fungsi untuk memuat model secara asinkron
+async def load_model_async():
+    global model
+    try:
+        print("Loading model asynchronously from local storage...")
+        # Operasi sinkron dimasukkan ke thread pool agar kompatibel dengan asyncio
+        loop = asyncio.get_event_loop()
+        model = await loop.run_in_executor(None, tf.keras.models.load_model, LOCAL_MODEL_PATH)
+        print("Model loaded successfully.")
+    except Exception as e:
+        print(f"Failed to load model: {e}")
+
+# Dependency untuk inisialisasi model
+async def get_model():
+    global model
+    if model is None:
+        await load_model_async()  # Pastikan model dimuat jika belum ada
+    return model
 
 @app.post("/")
-async def home(request: Request):
+async def home(request: Request, model: tf.keras.Model = Depends(get_model)):
     if model is None:
         raise HTTPException(status_code=500, detail="Model tidak tersedia")
     

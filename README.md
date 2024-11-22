@@ -44,5 +44,5 @@ Make sure to set these variables in the `.env` file before running the applicati
 ├── storage.py
 ├── requirements.txt
 ├── model
-│   └── sleepmodel.h5
+│   └── model.h5
 ```
