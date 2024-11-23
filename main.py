@@ -1,12 +1,10 @@
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from firestoredb import store_data
-from storage import download
 from datetime import datetime
 import tensorflow as tf
 import numpy as np
-import asyncio
 import os
 import base64
 import json
@@ -23,73 +21,71 @@ app.add_middleware(
     allow_headers=["*"],  # Izinkan semua header
 )
 
-def decode_base64_json(data):
-    # Mendekode data Base64 menjadi bytes
-    decoded_bytes = base64.b64decode(data)
-    
-    # Mengonversi bytes menjadi string (UTF-8) dan kemudian parsing JSON
-    decoded_str = decoded_bytes.decode('utf-8')
-    return json.loads(decoded_str)
+# Path model lokal
+LOCAL_MODEL_PATH = "model/model.h5"
 
 # Variabel global untuk menyimpan model
 model = None
-LOCAL_MODEL_PATH = "model/model.h5"
+model_loaded = False
 
-# Fungsi untuk memuat model secara asinkron
-async def load_model_async():
-    global model
+
+# Endpoint untuk meload model
+@app.post("/load-model")
+async def load_model(background_tasks: BackgroundTasks):
+    global model, model_loaded
+
+    if model_loaded:
+        return {"message": "Model already loaded"}
+
     try:
-        print("Loading model asynchronously from local storage...")
-        # Operasi sinkron dimasukkan ke thread pool agar kompatibel dengan asyncio
-        loop = asyncio.get_event_loop()
-        model = await loop.run_in_executor(None, tf.keras.models.load_model, LOCAL_MODEL_PATH)
-        print("Model loaded successfully.")
+        def load():
+            global model, model_loaded
+            print("Loading model...")
+            model = tf.keras.models.load_model(LOCAL_MODEL_PATH)
+            model_loaded = True
+            print("Model loaded successfully.")
+
+        # Muat model di background untuk menghindari blocking
+        background_tasks.add_task(load)
+        return {"message": "Model loading started in the background"}
     except Exception as e:
-        print(f"Failed to load model: {e}")
+        return {"message": f"Failed to start loading model: {str(e)}"}
 
-# Dependency untuk inisialisasi model
-async def get_model():
-    global model
-    if model is None:
-        await load_model_async()  # Pastikan model dimuat jika belum ada
-    return model
 
+# Endpoint prediksi
 @app.post("/")
-async def home(request: Request, model: tf.keras.Model = Depends(get_model)):
-    if model is None:
-        raise HTTPException(status_code=500, detail="Model tidak tersedia")
-    
+async def predict(request: Request):
+    global model, model_loaded
+
+    if not model_loaded:
+        raise HTTPException(status_code=503, detail="Model not loaded yet. Call /load-model first.")
+
     try:
         payload = await request.json()
-        pubsubMessage = decode_base64_json(payload['message']['data'])
-        image = download(pubsubMessage)
-        print(image)
+        # pubsubMessage = decode_base64_json(payload['message']['data'])
+        pubsubMessage = payload
 
-        new_data = np.array([
-            [
-                float(pubsubMessage['data']['water']),
-                float(pubsubMessage['data']['protein']),
-                float(pubsubMessage['data']['lipid']),
-                float(pubsubMessage['data']['ash']),
-                float(pubsubMessage['data']['carbohydrate']),
-                float(pubsubMessage['data']['fiber']),
-                float(pubsubMessage['data']['sugar']),
-            ]
-        ])
+        new_data = np.array([[
+            float(pubsubMessage['data']['water']),
+            float(pubsubMessage['data']['protein']),
+            float(pubsubMessage['data']['lipid']),
+            float(pubsubMessage['data']['ash']),
+            float(pubsubMessage['data']['carbohydrate']),
+            float(pubsubMessage['data']['fiber']),
+            float(pubsubMessage['data']['sugar']),
+        ]])
 
         createdAt = datetime.now().isoformat()
 
+        # Prediksi menggunakan model
         prediction = model.predict(new_data)
-        print(f"Data:")
         print("Predicted Probabilities:", prediction[0])
-        print(f"{prediction}")
         
-        result = round(float(prediction[0][0]),2)
+        result = round(float(prediction[0][0]), 2)
         data = {
             "userId": pubsubMessage["userId"],
             "inferenceId": pubsubMessage["inferenceId"],
             "result": result,
-            "statusImage":image,
             "createdAt": createdAt,
         }
 
@@ -113,6 +109,13 @@ async def home(request: Request, model: tf.keras.Model = Depends(get_model)):
                 "message": f"Error: {e}",
             }
         )
+
+
+def decode_base64_json(data):
+    decoded_bytes = base64.b64decode(data)
+    decoded_str = decoded_bytes.decode("utf-8")
+    return json.loads(decoded_str)
+
 
 if __name__ == "__main__":
     import uvicorn
