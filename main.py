@@ -1,5 +1,4 @@
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
-from google.cloud import pubsub_v1
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from io import BytesIO
