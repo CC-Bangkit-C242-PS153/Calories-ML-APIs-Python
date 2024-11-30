@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from io import BytesIO
 from PIL import Image
 from storage import download
+from  firestoredb import store_data
+from datetime import datetime
 import tensorflow as tf
 import numpy as np
 import os
@@ -16,7 +18,9 @@ import threading
 # Membuat aplikasi FastAPI
 app = FastAPI()
 LOCAL_MODEL_PATH = "model/model.h5"
+LOCAL_MODEL_PATH_2 = "model/countmodel.h5"
 model = None
+countModel = None
 model_loaded = False
 load_lock = threading.Lock()
 
@@ -51,9 +55,10 @@ async def wait_for_model_to_load(timeout: int = 30):
 
 def load():
             with load_lock:
-                global model, model_loaded
+                global model, model_loaded, countModel
                 print("Loading model...")
                 model = tf.keras.models.load_model(LOCAL_MODEL_PATH)
+                countModel = tf.keras.models.load_model(LOCAL_MODEL_PATH_2)
                 model_loaded = True
                 print("Model loaded successfully.")
 
@@ -65,16 +70,6 @@ def preprocess_image(contents):
     image_array = np.array(image)
     image_array = image_array / 255.0  
     return np.expand_dims(image_array, axis=0)
-
-# Inisialisasi klien Pub/Sub
-publisher = pubsub_v1.PublisherClient()
-
-async def publish_pubsub_message(topic_name: str, data: dict):
-     # Konversi data ke JSON dan ubah ke bytes
-    message_bytes = json.dumps(data).encode("utf-8")
-
-    # Publikasikan pesan ke Pub/Sub
-    publisher.publish(topic_name, message_bytes)
 
 # Endpoint untuk meload model
 @app.post("/load-model")
@@ -116,7 +111,7 @@ async def load_model(background_tasks: BackgroundTasks):
 
 @app.post("/")
 async def home(request: Request):
-    global model, model_loaded
+    global model, countModel, model_loaded
 
     while not model_loaded:
          load()
@@ -129,6 +124,16 @@ async def home(request: Request):
         pubsubMessage = decode_base64_json(payload['message']['data'])
         image = download(pubsubMessage)
         preimage = preprocess_image(image)
+        createdAt = datetime.now().isoformat()
+        new_data = np.array([[
+            float(pubsubMessage['data']['water']),
+            float(pubsubMessage['data']['protein']),
+            float(pubsubMessage['data']['lipid']),
+            float(pubsubMessage['data']['ash']),
+            float(pubsubMessage['data']['carbohydrate']),
+            float(pubsubMessage['data']['fiber']),
+            float(pubsubMessage['data']['sugar']),
+        ]])
 
         # Prediksi menggunakan model
         result = ""
@@ -140,8 +145,17 @@ async def home(request: Request):
         
         pubsubMessage['data']['foodCategory'] = result
         print(result)
+        caloriesPrediction = countModel.predict(new_data)
+        caloriesResult = round(float(caloriesPrediction[0][0]),2)
+        data = {
+            "userId": pubsubMessage["userId"],
+            "inferenceId": pubsubMessage["inferenceId"],
+            "foodCategories": result,
+            "foodCalories": caloriesResult,
+            "createdAt": createdAt,
+        }
         
-        await publish_pubsub_message("caloriesCount", pubsubMessage)
+        store_data(pubsubMessage["userId"], pubsubMessage["inferenceId"], data)
         
         return JSONResponse(
             status_code=201,
@@ -149,6 +163,7 @@ async def home(request: Request):
                 "status": "Success",
                 "statusCode": 201,
                 "message": "Successfully to do inference",
+                "data":data
             }
         )
     except Exception as e:
