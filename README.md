@@ -45,5 +45,6 @@ Make sure to set these variables in the `.env` file before running the applicati
 ├── firestoredb.py
 ├── requirements.txt
 ├── model
+│   ├── countModel.h5
 │   └── model.h5
 ```
