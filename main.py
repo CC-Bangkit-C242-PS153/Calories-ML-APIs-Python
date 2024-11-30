@@ -142,14 +142,13 @@ async def home(request: Request):
         else:
              result = "Sehat"
         
-        pubsubMessage['data']['foodCategory'] = result
         print(result)
         caloriesPrediction = countModel.predict(new_data)
         caloriesResult = round(float(caloriesPrediction[0][0]),2)
         data = {
             "userId": pubsubMessage["userId"],
             "inferenceId": pubsubMessage["inferenceId"],
-            "foodCategories": result,
+            "foodCategory": result,
             "foodCalories": caloriesResult,
             "createdAt": createdAt,
         }
