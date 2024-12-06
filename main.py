@@ -18,8 +18,10 @@ import threading
 app = FastAPI()
 LOCAL_MODEL_PATH = "model/model.h5"
 LOCAL_MODEL_PATH_2 = "model/countmodel.h5"
+LOCAL_MODEL_PATH_3 = "model/caloriesClassification.h5"
 model = None
 countModel = None
+caloriesClassification = None
 model_loaded = False
 load_lock = threading.Lock()
 
@@ -54,10 +56,11 @@ async def wait_for_model_to_load(timeout: int = 30):
 
 def load():
             with load_lock:
-                global model, model_loaded, countModel
+                global model, model_loaded, countModel, caloriesClassification
                 print("Loading model...")
                 model = tf.keras.models.load_model(LOCAL_MODEL_PATH)
                 countModel = tf.keras.models.load_model(LOCAL_MODEL_PATH_2)
+                caloriesClassification = tf.keras.models.load_model(LOCAL_MODEL_PATH_3)
                 model_loaded = True
                 print("Model loaded successfully.")
 
@@ -145,13 +148,19 @@ async def home(request: Request):
         print(result)
         caloriesPrediction = countModel.predict(new_data)
         caloriesResult = round(float(caloriesPrediction[0][0]),2)
+        caloriesClass = caloriesClassification.predict(preimage)
+        index = np.argmax(caloriesClass[0])
+        class_names = ['High Calories', 'Medium Calories', 'Low Calories']
+
         data = {
             "userId": pubsubMessage["userId"],
             "inferenceId": pubsubMessage["inferenceId"],
             "foodCategory": result,
             "foodCalories": caloriesResult,
+            "foodCaloriesClass": class_names[index],
             "createdAt": createdAt,
         }
+
         
         store_data(pubsubMessage["userId"], pubsubMessage["inferenceId"], data)
         
