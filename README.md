@@ -19,9 +19,10 @@ To get started with the Fitcal MLs backend, follow these steps:
 ## Dependencies
 
 ```
-fastapi==0.115.5
-google-cloud-pubsub==2.27.1
+﻿fastapi==0.115.5
 google-cloud-storage==2.18.2
+google-cloud-firestore==2.19.0
+grpcio-status==1.68.0
 pillow==11.0.0
 tensorflow==2.18.0
 uvicorn==0.32.0
@@ -41,7 +42,9 @@ Make sure to set these variables in the `.env` file before running the applicati
 ├── .gitignore
 ├── main.py
 ├── storage.py
+├── firestoredb.py
 ├── requirements.txt
 ├── model
+│   ├── countModel.h5
 │   └── model.h5
 ```
