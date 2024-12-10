@@ -46,5 +46,6 @@ Make sure to set these variables in the `.env` file before running the applicati
 ├── requirements.txt
 ├── model
 │   ├── countModel.h5
-│   └── model.h5
+│   ├── model.h5
+│   └── caloriesClassification.h5
 ```
